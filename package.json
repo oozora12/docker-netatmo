@@ -1,0 +1,15 @@
+{
+    "name": "netatmo-docker",
+    "description": "netatmo docker",
+    "version": "0.0.1",
+    "private": true,
+    "dependencies": {
+        "netatmo": "~1.3.0",
+        "async": "~1.4.2",
+        "lodash": "~3.10.1",
+        "moment-timezone": "~0.4.0"
+    },
+    "scripts": {
+        "start": "node app.js"
+    }
+}
