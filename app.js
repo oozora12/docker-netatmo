@@ -12,12 +12,6 @@ var netatmo = require('netatmo'),
         'password': process.env.PASSWORD,
     });
 
-function getUser(callback) {
-    api.getUser(function(err, user) {
-        if (err) return callback(err);
-        callback(null, user.devices);
-    });
-}
 
 function getMyDevices(deviceIds, devices, callback) {
     var selectDevices = flatMap(deviceIds, function(id) {
@@ -42,59 +36,57 @@ function getMyModules(deviceIds, modules, callback) {
 }
 
 
-function getDevices(deviceIds, callback) {
-    api.getDevicelist(function(err, devices, modules) {
-        if (err) return callback(err);
-        async.series([
-            _.partial(getMyDevices, deviceIds, devices),
-            _.partial(getMyModules, deviceIds, modules)
-        ],function(err, results) {
-            if(err) return callback(err);
-            else callback(null, results);
-        });
-    });
+function toJST(time_utc) {
+  return moment(time_utc, 'X').tz("Asia/Tokyo").format();
 }
 
+function resultsOut(results) {
+    var devices = results[0],
+        modules = results[1];
 
-function toJST(time_utc) {
-  return moment(time_utc, 'X').tz("Asia/Tokyo").format()
+    _.forEach(devices, function(device) {
+        console.log({
+            module_name: device.module_name,
+            time_utc: toJST(device.dashboard_data.time_utc),
+            noise: device.dashboard_data.Noise,
+            temperature: device.dashboard_data.Temperature,
+            humidity: device.dashboard_data.Humidity,
+            pressure: device.dashboard_data.Pressure,
+            co2: device.dashboard_data.CO2
+        });
+    });
+
+    _.forEach(modules, function(module) {
+        console.log({
+            module_name: module.module_name,
+            time_utc: toJST(module.dashboard_data.time_utc),
+            temperature: module.dashboard_data.Temperature,
+            humidity: module.dashboard_data.Humidity
+        });
+    });
 }
 
 function measure(callback) {
     async.waterfall([
-        getUser,
-        getDevices
-    ], function(err, results) {
-        if(err) return callback(err);
-
-        var devices = results[0],
-            modules = results[1];
-
-        _.forEach(devices, function(device) {
-            console.log({
-                module_name: device.module_name,
-                time_utc: toJST(device.dashboard_data.time_utc),
-                noise: device.dashboard_data.Noise,
-                temperature: device.dashboard_data.Temperature,
-                humidity: device.dashboard_data.Humidity,
-                pressure: device.dashboard_data.Pressure,
-                co2: device.dashboard_data.CO2
+        function(callback) {
+            api.getUser(callback);
+        },
+        function(user, callback) {
+            api.getDevicelist(function(err, devices, modules) {
+                if (err) return callback(err);
+                async.series([
+                    _.partial(getMyDevices, user.devices, devices),
+                    _.partial(getMyModules, user.devices, modules)
+                ], callback);
             });
+        }], function(err, results) {
+            if (err) return console.log(err);
+            resultsOut(results);
+            console.log('----');
+            setTimeout(callback, 5000);
         });
-
-        _.forEach(modules, function(module) {
-            console.log({
-                module_name: module.module_name,
-                time_utc: toJST(module.dashboard_data.time_utc),
-                temperature: module.dashboard_data.Temperature,
-                humidity: module.dashboard_data.Humidity
-            });
-        });
-
-        setTimeout(callback, 10000);
-    });
 }
 
-async.forever(measure,function(err) {
-    if (err) console.log(err);
+async.forever( measure, function(err) {
+    if(err) console.log(err);
 });
