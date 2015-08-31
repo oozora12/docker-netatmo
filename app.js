@@ -32,7 +32,7 @@ function toJST(time_utc) {
 function pluckDevice(device) {
     return {
         module_name: device.module_name,
-        time_utc: toJST(device.dashboard_data.time_utc),
+        time_jst: toJST(device.dashboard_data.time_utc),
         noise: device.dashboard_data.Noise,
         temperature: device.dashboard_data.Temperature,
         humidity: device.dashboard_data.Humidity,
@@ -44,7 +44,7 @@ function pluckDevice(device) {
 function pluckModule(module) {
     var retval = {
         module_name: module.module_name,
-        time_utc: toJST(module.dashboard_data.time_utc),
+        time_jst: toJST(module.dashboard_data.time_utc),
         temperature: module.dashboard_data.Temperature,
         humidity: module.dashboard_data.Humidity
     };
