@@ -3,7 +3,6 @@
 var netatmo = require('netatmo'),
     async = require('async'),
     _ = require('lodash'),
-    flatMap = _.compose(_.flatten, _.map),
     moment = require('moment-timezone'),
     api = new netatmo({
         'client_id': process.env.CLIENT_ID,
@@ -12,56 +11,56 @@ var netatmo = require('netatmo'),
         'password': process.env.PASSWORD,
     });
 
-
-function getMyDevices(deviceIds, devices, callback) {
-    var selectDevices = flatMap(deviceIds, function(id) {
-        return flatMap(devices, function(device) {
-            if (id == device._id) return [device];
-            else return [];
-        });
+function getMyDevices(deviceIds, devices, modules, callback) {
+    var myDevices = _.map(deviceIds, function(id) {
+        return {
+            device: _.find(devices, function(device) {
+                return id = device._id;
+            }),
+            modules: _.filter(modules, function(module) {
+                return id == module.main_device;
+            })
+        };
     });
-    if (_.isEmpty(selectDevices)) return callback(new Error('my devices are not found'));
-    callback(null, selectDevices);
+    callback(null, myDevices);
 }
-
-function getMyModules(deviceIds, modules, callback) {
-    var selectModules = flatMap(deviceIds, function(id) {
-        return flatMap(modules, function(module) {
-            if (id == module.main_device) return [module];
-            else return [];
-        });
-    });
-    if (_.isEmpty(selectModules)) return callback(new Error('my modules are not found'));
-    callback(null, selectModules);
-}
-
 
 function toJST(time_utc) {
   return moment(time_utc, 'X').tz("Asia/Tokyo").format();
 }
 
+function pluckDevice(device) {
+    return {
+        module_name: device.module_name,
+        time_utc: toJST(device.dashboard_data.time_utc),
+        noise: device.dashboard_data.Noise,
+        temperature: device.dashboard_data.Temperature,
+        humidity: device.dashboard_data.Humidity,
+        pressure: device.dashboard_data.Pressure,
+        co2: device.dashboard_data.CO2
+    };
+}
+
+function pluckModule(module) {
+    var retval = {
+        module_name: module.module_name,
+        time_utc: toJST(module.dashboard_data.time_utc),
+        temperature: module.dashboard_data.Temperature,
+        humidity: module.dashboard_data.Humidity
+    };
+    // for the additionnal indoor module
+    // https://dev.netatmo.com/doc/methods/devicelist
+    if (module.type == 'NAModule4'){
+        retval[co2] = module.dashboard_data.CO2;
+    }
+    return retval;
+}
+
 function resultsOut(results) {
-    var devices = results[0],
-        modules = results[1];
-
-    _.forEach(devices, function(device) {
-        console.log({
-            module_name: device.module_name,
-            time_utc: toJST(device.dashboard_data.time_utc),
-            noise: device.dashboard_data.Noise,
-            temperature: device.dashboard_data.Temperature,
-            humidity: device.dashboard_data.Humidity,
-            pressure: device.dashboard_data.Pressure,
-            co2: device.dashboard_data.CO2
-        });
-    });
-
-    _.forEach(modules, function(module) {
-        console.log({
-            module_name: module.module_name,
-            time_utc: toJST(module.dashboard_data.time_utc),
-            temperature: module.dashboard_data.Temperature,
-            humidity: module.dashboard_data.Humidity
+    _.forEach(results, function(result) {
+        console.log(pluckDevice(result.device));
+        _.forEach(result.modules, function(module) {
+            console.log(pluckModule(module));
         });
     });
 }
@@ -74,16 +73,15 @@ function measure(callback) {
         function(user, callback) {
             api.getDevicelist(function(err, devices, modules) {
                 if (err) return callback(err);
-                async.series([
-                    _.partial(getMyDevices, user.devices, devices),
-                    _.partial(getMyModules, user.devices, modules)
-                ], callback);
+                getMyDevices(user.devices,
+                             devices, modules,
+                             callback);
             });
         }], function(err, results) {
             if (err) return console.log(err);
             resultsOut(results);
             console.log('----');
-            setTimeout(callback, 5000);
+            setTimeout(callback, process.env.INTERVAL);
         });
 }
 

@@ -8,5 +8,6 @@ netatmo:
     - CLIENT_SECRET=
     - USERNAME=
     - PASSWORD=
+    - INTERVAL=1800000
   ports:
     - 3033:3000
