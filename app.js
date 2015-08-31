@@ -15,7 +15,7 @@ function getMyDevices(deviceIds, devices, modules, callback) {
     var myDevices = _.map(deviceIds, function(id) {
         return {
             device: _.find(devices, function(device) {
-                return id = device._id;
+                return id == device._id;
             }),
             modules: _.filter(modules, function(module) {
                 return id == module.main_device;
